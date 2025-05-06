@@ -3,6 +3,7 @@ require("colors");
 
 const express = require("express");
 const ExpressWs = require("express-ws");
+const cors = require("cors"); // Import the cors middleware
 
 const {
   GptService,
@@ -16,12 +17,30 @@ const { connectToDatabase } = require("./db/mongo-client");
 const {
   getHelpRequests,
   respondToHelpRequest,
+  deleteHelpRequest,
 } = require("./functions/helpRequests");
+const {
+  getKnowledgeBases,
+  updateKnowledgeBase,
+  deleteKnowledgeBase,
+  addKnowledgeBase,
+} = require("./functions/knowledgeBase");
 
 const VoiceResponse = require("twilio").twiml.VoiceResponse;
 
 const app = express();
 ExpressWs(app);
+
+// Use CORS middleware
+// This will allow all origins. For production, you might want to configure it
+// to allow only specific origins, e.g., cors({ origin: 'http://your-frontend-domain.com' })
+app.use(cors());
+
+// Ensure Express can parse JSON request bodies, if not already done explicitly
+// (though app.post for /respondToHelpRequest implies it might be handled,
+// it's good practice to have it explicitly if you're using req.body)
+app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // If you also handle form data
 
 const PORT = process.env.PORT || 3000;
 
@@ -62,6 +81,87 @@ app.post("/respondToHelpRequest", async (req, res) => {
   } catch (error) {
     console.error("Error responding to help request:", error);
     res.status(500).json({ error: "Failed to respond to help request" });
+  }
+});
+
+app.delete("/helpRequest", async (req, res) => {
+  try {
+    const { requestId } = req.body;
+    if (!requestId) {
+      return res.status(400).json({ error: "Request ID is required" });
+    }
+
+    await deleteHelpRequest(requestId);
+
+    res.json({});
+  } catch (error) {
+    console.error("Error fetching help requests:", error);
+    res.status(500).json({ error: "Failed to fetch help requests" });
+  }
+});
+
+app.get("/knowledgeBases", async (req, res) => {
+  try {
+    const knowledgeBases = await getKnowledgeBases();
+
+    res.json(knowledgeBases);
+  } catch (error) {
+    console.error("Error fetching Knowledge Bases:", error);
+    res.status(500).json({ error: "Failed to fetch Knowledge Bases" });
+  }
+});
+
+app.post("/addKnowledgeBase", async (req, res) => {
+  try {
+    const { question, answer } = req.body;
+
+    if (!question || !answer) {
+      return res.status(400).json({ error: "input is invalid" });
+    }
+
+    const knowledgeBases = await addKnowledgeBase(question, answer);
+
+    res.json(knowledgeBases);
+  } catch (error) {
+    console.error("Error fetching Knowledge Bases:", error);
+    res.status(500).json({ error: "Failed to fetch Knowledge Bases" });
+  }
+});
+
+app.post("/updateKnowledgeBase", async (req, res) => {
+  try {
+    const { knowledgeBaseId, question, answer } = req.body;
+
+    if (!knowledgeBaseId || !question || !answer) {
+      return res.status(400).json({ error: "input is invalid" });
+    }
+
+    const knowledgeBases = await updateKnowledgeBase(
+      knowledgeBaseId,
+      question,
+      answer
+    );
+
+    res.json(knowledgeBases);
+  } catch (error) {
+    console.error("Error fetching Knowledge Bases:", error);
+    res.status(500).json({ error: "Failed to fetch Knowledge Bases" });
+  }
+});
+
+app.delete("/deleteKnowledgeBase", async (req, res) => {
+  try {
+    const { knowledgeBaseId } = req.body;
+    if (!knowledgeBaseId) {
+      return res.status(400).json({ error: "knowledgeBaseId is required" });
+    }
+
+    await deleteKnowledgeBase(knowledgeBaseId);
+
+    res.json({});
+  } catch (error) {
+    console.error("Error fetching help requests:", error);
+    res.status(500).json({ error: "Failed to fetch help requests" });
   }
 });
 

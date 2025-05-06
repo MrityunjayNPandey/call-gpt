@@ -9,9 +9,10 @@ const getHelpRequests = async (status) => {
 
   return helpRequests;
 };
+
 const respondToHelpRequest = async (requestId, response) => {
-  const updatedRequest = await HelpRequest.findOneAndUpdate(
-    { _id: requestId, status: "pending" },
+  const updatedRequest = await HelpRequest.findByIdAndUpdate(
+    requestId,
     {
       supervisorResponse: response,
       status: "resolved",
@@ -26,18 +27,25 @@ const respondToHelpRequest = async (requestId, response) => {
 
   await KnowledgeBase.create({
     question: updatedRequest.question,
-    answer: updatedRequest.answer,
+    answer: updatedRequest.supervisorResponse,
   });
 
   globalKnowledgeBase.push({
     question: updatedRequest.question,
-    answer: updatedRequest.answer,
+    answer: updatedRequest.supervisorResponse,
   });
 
-  return helpRequest;
+  return updatedRequest;
+};
+
+const deleteHelpRequest = async (requestId) => {
+  await HelpRequest.findByIdAndDelete(requestId);
+
+  return true;
 };
 
 module.exports = {
   respondToHelpRequest,
   getHelpRequests,
+  deleteHelpRequest,
 };

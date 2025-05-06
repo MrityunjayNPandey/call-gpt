@@ -9,6 +9,12 @@ const KnowledgeBaseSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  createdAt: {
+    type: Date,
+  },
+  updatedAt: {
+    type: Date,
+  },
 });
 
 // Update the updatedAt field on save

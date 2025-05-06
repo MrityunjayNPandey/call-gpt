@@ -1,4 +1,3 @@
-const { MongoClient } = require("mongodb");
 const { default: mongoose } = require("mongoose");
 require("dotenv").config();
 

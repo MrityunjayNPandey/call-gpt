@@ -2,6 +2,22 @@ require("colors");
 const EventEmitter = require("events");
 const OpenAI = require("openai");
 const tools = require("../functions/function-manifest");
+const KnowledgeBase = require("../db/models/KnowledgeBase");
+
+// Static knowledge base that will be loaded once
+let globalKnowledgeBase = [];
+
+// Load knowledge base once at server startup
+async function loadGlobalKnowledgeBase() {
+  try {
+    globalKnowledgeBase = await KnowledgeBase.find({}).lean();
+    console.log(
+      `Loaded ${globalKnowledgeBase.length} items from knowledge base`
+    );
+  } catch (error) {
+    console.error("Error loading knowledge base:", error);
+  }
+}
 
 // Import all functions included in function manifest
 // Note: the function name and file name must be the same
@@ -15,14 +31,19 @@ class GptService extends EventEmitter {
   constructor() {
     super();
     this.openai = new OpenAI({
-      baseURL: "http://127.0.0.1:1234/v1", // Your local server URL
+      baseURL: "https://api.groq.com/openai/v1",
+      apiKey: process.env.GROQ_API_KEY,
     });
     (this.userContext = [
       {
         role: "system",
         content:
-          "You are an outbound sales representative selling Apple Airpods. You have a youthful and cheery personality. Keep your responses as brief as possible but make every attempt to keep the caller on the phone without being rude. Don't ask more than 1 question at a time. Don't make assumptions about what values to plug into functions. Ask for clarification if a user request is ambiguous. Speak out all prices to include the currency. Please help them decide between the airpods, airpods pro and airpods max by asking questions like 'Do you prefer headphones that go in your ear or over the ear?'. If they are trying to choose between the airpods and airpods pro try asking them if they need noise canceling. Once you know which model they would like ask them how many they would like to purchase and try to get them to place an order. You must add a '•' symbol every 5 to 10 words at natural pauses where your response can be split for text to speech.",
+          "You are an outbound sales representative selling Apple Airpods. You have a youthful and cheery personality. Keep your responses as brief as possible but make every attempt to keep the caller on the phone without being rude. Don't reply more than once at a time. Don't make assumptions about what values to plug into functions. Your knowledge should be strictly from this and only this chat context only. Ask for clarification if a user request is ambiguous, but once a choice like headphone type (in-ear vs over-ear) or a specific model (like AirPods Pro Max) is clearly stated by the user, accept that information and move on to the next step. Speak out all prices to include the currency. Initially, help them decide between models by asking about preferences like 'in-ear or over-ear' or 'noise canceling'. However, once they express a clear preference for a specific model (e.g., 'AirPods Pro Max') or have answered those initial clarifying questions, your priority is to confirm the quantity and then use the 'placeOrder' tool. You have tools available to check inventory, check prices, place orders, transfer calls, and ask your supervisor for help; use these tools decisively once you have the necessary information. For example, if you have clarified with the user and still you're unsure, you MUST use the 'askSupervisor' tool.",
       },
+      ...globalKnowledgeBase.map((item) => ({
+        role: "system",
+        content: `Question: ${item.question}\nAnswer: ${item.answer}`,
+      })),
       {
         role: "assistant",
         content:
@@ -68,8 +89,7 @@ class GptService extends EventEmitter {
 
     // Step 1: Send user transcription to Chat GPT
     const stream = await this.openai.chat.completions.create({
-      model: "qwen3-0.6b",
-      baseURL: "ttp://127.0.0.1:1234/v1",
+      model: "deepseek-r1-distill-llama-70b",
       messages: this.userContext,
       tools: tools,
       stream: true,
@@ -80,7 +100,7 @@ class GptService extends EventEmitter {
     let functionName = "";
     let functionArgs = "";
     let finishReason = "";
-    let isThinking = false; // Add a flag to track if we're inside a thinking block
+    let isThinking = false; // flag to track if we're inside a thinking block
 
     function collectToolInformation(deltas) {
       let name = deltas.tool_calls[0]?.function?.name || "";
@@ -181,4 +201,4 @@ class GptService extends EventEmitter {
   }
 }
 
-module.exports = { GptService };
+module.exports = { GptService, loadGlobalKnowledgeBase, globalKnowledgeBase };

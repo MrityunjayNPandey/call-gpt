@@ -19,6 +19,8 @@
     "dotenv": "^16.3.1",
     "express": "^4.19.2",
     "express-ws": "^5.0.2",
+    "mongodb": "^6.16.0",
+    "mongoose": "^8.14.1",
     "node-fetch": "^2.7.0",
     "openai": "^4.20.1",
     "twilio": "^4.19.3",
